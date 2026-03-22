@@ -10,7 +10,7 @@ export const EducationRecordSchema = z.object({
   yearOfPassing: z
     .number()
     .int()
-    .min(1970, "Year seems too early")
+    .min(1980, "Year must be 1980 or later")
     .max(new Date().getFullYear(), "Year cannot be in the future"),
   scoreValue: z.number().positive("Score must be positive"),
   scoreScale: z.enum(["percentage", "cgpa_10", "cgpa_4", "grade"]),

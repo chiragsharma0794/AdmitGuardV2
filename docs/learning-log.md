@@ -51,7 +51,37 @@ Path-aware forms solve this cleanly.
 
 ## Milestone 1 — App Shell & Input Layer
 
-> *To be filled after Milestone 1 is complete.*
+### What was built
+- Multi-step form with 4 steps: Applicant → Education → Work → Review
+- Reusable UI primitives: `Input`, `Select`, `Button`, `Card`, `StepNav`
+- Central form state hook: `useFormState.ts`
+- Path-adaptive education records (fields change based on level)
+- Dynamic add/remove for education and work entries
+- Read-only review step with masked Aadhaar
+
+### Concept: Lifting State Up
+
+In React, each component manages its own state. In a multi-step form, if each step had its own state, navigating back would lose data. The solution is **lifting state up**: declare all state in the parent (`app/page.tsx`) via a custom hook (`useFormState`), then pass down only what each step needs.
+
+This pattern is core React — understand it well before moving on.
+
+### Concept: Config-Driven UI
+
+The `EducationStep` component reads `LEVELS_WITH_BACKLOGS` and `LEVELS_WITH_STREAM` from `lib/config/rules.ts` to decide which fields to show. This means:
+- The UI and the backend validation use the **same config**.
+- If you add a new level later, you update the config once and both layers adapt.
+
+### Concept: Form Data ≠ API Data
+
+In the form, `yearOfPassing` is a *string* (because `<input>` values are always strings). At submission time, we convert it to a *number* before sending it to the API. This conversion happens in `handleSubmit()` in `page.tsx`. The Zod schema on the server expects numbers, so this step is critical.
+
+### Lesson learned: Tailwind v3 vs v4
+
+We discovered that `npm install tailwindcss` installs v3.4.x, but `@tailwindcss/postcss` requires v4. Mixing them causes build failures. Stick with one version — we're using **v3** with the classic `@tailwind base/components/utilities` directives.
+
+### What to try yourself
+- Open `lib/config/rules.ts` and add `"12th"` to `LEVELS_WITH_BACKLOGS`. Refresh the Education step and see if the backlog field appears for 12th records.
+- Try selecting Path B and adding a 10th + Diploma record. Notice that 12th is marked optional.
 
 ---
 
