@@ -85,9 +85,45 @@ We discovered that `npm install tailwindcss` installs v3.4.x, but `@tailwindcss/
 
 ---
 
-## Milestone 2 — Backend Validation Engine
+### What was built
+- `POST /api/applications` route — the main submission endpoint
+- 3-tier validation pipeline: Zod parsing → Tier 1 hard reject → Tier 2 soft flags → Tier 3 enrichment
+- Score normalization (percentage/CGPA/grade → 0–100)
+- Local JSON persistence (`data/applications.json`) with duplicate detection
+- 40 unit tests across 3 test suites (helpers, tier1, tier2)
 
-> *To be filled after Milestone 2 is complete.*
+### Concept: Tiered Validation
+
+Validation happens in layers, each with a different purpose:
+
+| Tier | Purpose | Failure Behavior |
+|------|---------|-----------------|
+| Zod Schema | Structural — missing fields, wrong types | 422, reject |
+| Tier 1 | Business rules — age, duplicates, chronology | 422, reject |
+| Tier 2 | Advisory — gaps, low scores, staleness | Save with FLAGGED status |
+| Tier 3 | Enrichment — normalize scores, compute metrics | Always runs (after T1) |
+
+**Why not one big validator?** Because each tier has different failure behavior. Separating them makes the code easier to reason about and test independently.
+
+### Concept: Field-Level Error Paths
+
+Instead of returning a generic "validation failed" message, the API returns a map of `field.path → error message`. For example:
+```json
+{ "applicant.dateOfBirth": "Applicant must be at least 18 years old. Current age: 16." }
+```
+This lets the frontend highlight the exact field that failed — much better UX than a single error banner.
+
+### Concept: Score Normalization
+
+CGPA 8.0/10 and 80% are the same thing. But CGPA 3.2/4 = 80% too. The `normalizeScore()` function converts all scales to a 0–100 percentage. This is used for:
+- Fair comparison across education records
+- Risk score computation (Milestone 3)
+- Soft flag thresholds (`SCORE_SOFT_FLAG_THRESHOLD: 50`)
+
+### What to try yourself
+- Run `npm test` and read the test output. Each test name describes a business rule.
+- Try changing `THRESHOLDS.MIN_AGE_YEARS` to 21 and run tests — which ones break?
+- Open `data/applications.json` after submitting a form and study the saved structure.
 
 ---
 
