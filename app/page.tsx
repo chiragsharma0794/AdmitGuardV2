@@ -1,14 +1,12 @@
 // app/page.tsx
-// Main application page — assembles all 4 steps with step navigation.
+// Main page — multi-step form + confirmation screen.
 //
-// HOW THIS WORKS:
-// 1. useFormState() holds ALL form data across steps (state is "lifted" here)
-// 2. useState for currentStep controls which step component renders
-// 3. StepNav shows progress at the top
-// 4. Back/Next buttons navigate between steps
-// 5. On final Submit, the form data is POSTed to /api/applications (Milestone 2)
-//
-// Right now (M1), Submit just logs to console. The real backend comes in M2.
+// FLOW:
+// 1. useFormState() holds all data across steps
+// 2. On Submit → POST /api/applications → get full assessment
+// 3. If success → show ConfirmationScreen with risk/categorization/quality
+// 4. If error → show validation errors inline
+// 5. "Submit Another" resets everything
 
 "use client";
 
@@ -19,6 +17,7 @@ import { ApplicantStep } from "@/components/applicant/ApplicantStep";
 import { EducationStep } from "@/components/education/EducationStep";
 import { WorkStep } from "@/components/work/WorkStep";
 import { ReviewStep } from "@/components/review/ReviewStep";
+import { ConfirmationScreen } from "@/components/confirmation/ConfirmationScreen";
 import { useFormState } from "@/lib/hooks/useFormState";
 
 const STEPS = [
@@ -28,11 +27,15 @@ const STEPS = [
   { label: "Review", description: "Verify & submit" },
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SubmitResultSuccess = any;
+
 export default function HomePage() {
   const form = useFormState();
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [submitResult, setSubmitResult] = useState<Record<string, unknown> | null>(null);
+  const [submitResult, setSubmitResult] = useState<SubmitResultSuccess | null>(null);
+  const [submitErrors, setSubmitErrors] = useState<Record<string, string> | null>(null);
 
   function goNext() {
     setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -42,11 +45,16 @@ export default function HomePage() {
     setCurrentStep((s) => Math.max(s - 1, 0));
   }
 
+  function handleNewApplication() {
+    // Reset everything — form, step, results
+    window.location.reload();
+  }
+
   async function handleSubmit() {
     setSubmitting(true);
     setSubmitResult(null);
+    setSubmitErrors(null);
 
-    // Build the payload that matches our SubmissionSchema shape
     const payload = {
       applicant: {
         ...form.formState.applicant,
@@ -79,8 +87,6 @@ export default function HomePage() {
     };
 
     try {
-      // M2 will have a real /api/applications endpoint.
-      // For now, log the payload so you can inspect it in the browser console.
       const res = await fetch("/api/applications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,22 +94,49 @@ export default function HomePage() {
       });
 
       const data = await res.json();
-      setSubmitResult(data);
-    } catch (err) {
-      // If /api/applications doesn't exist yet (M1), show the payload directly
-      console.log("Submission payload:", JSON.stringify(payload, null, 2));
-      setSubmitResult({
-        _note: "API endpoint not yet implemented (Milestone 2). Payload logged to console.",
-        payload,
-      });
+
+      if (data.success) {
+        setSubmitResult(data);
+      } else {
+        setSubmitErrors(data.errors || { _general: "Submission failed." });
+      }
+    } catch {
+      setSubmitErrors({ _general: "Network error. Please try again." });
     } finally {
       setSubmitting(false);
     }
   }
 
+  // ── If we have a successful result, show the confirmation screen ──
+  if (submitResult?.success) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <header className="border-b border-slate-200 bg-white">
+          <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white text-sm font-bold">
+                AG
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-slate-900">AdmitGuard v2</h1>
+                <p className="text-xs text-slate-400">Admission Validation Platform</p>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+          <ConfirmationScreen
+            result={submitResult}
+            onNewApplication={handleNewApplication}
+          />
+        </div>
+      </main>
+    );
+  }
+
+  // ── Normal form view ──
   return (
     <main className="min-h-screen bg-slate-50">
-      {/* ── Header ── */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
@@ -118,11 +151,9 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ── Form Area ── */}
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <StepNav steps={STEPS} currentStep={currentStep} />
 
-        {/* ── Step Content ── */}
         <div className="mb-8">
           {currentStep === 0 && (
             <ApplicantStep
@@ -151,6 +182,22 @@ export default function HomePage() {
           {currentStep === 3 && <ReviewStep formState={form.formState} />}
         </div>
 
+        {/* ── Validation Errors ── */}
+        {submitErrors && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+            <h3 className="text-sm font-semibold text-red-800 mb-2">
+              Validation Errors
+            </h3>
+            <ul className="space-y-1">
+              {Object.entries(submitErrors).map(([field, msg]) => (
+                <li key={field} className="text-sm text-red-700">
+                  <span className="font-medium">{field}:</span> {msg}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* ── Navigation Footer ── */}
         <div className="flex items-center justify-between border-t border-slate-200 pt-6">
           <Button
@@ -169,18 +216,6 @@ export default function HomePage() {
             </Button>
           )}
         </div>
-
-        {/* ── Submit Result (temporary — replaced by proper UI in M3) ── */}
-        {submitResult && (
-          <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-slate-800 mb-2">
-              Submission Result
-            </h3>
-            <pre className="text-xs text-slate-600 overflow-auto max-h-96 bg-slate-50 rounded p-3">
-              {JSON.stringify(submitResult, null, 2)}
-            </pre>
-          </div>
-        )}
       </div>
     </main>
   );

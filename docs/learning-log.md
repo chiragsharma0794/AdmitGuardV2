@@ -129,7 +129,48 @@ CGPA 8.0/10 and 80% are the same thing. But CGPA 3.2/4 = 80% too. The `normalize
 
 ## Milestone 3 — Intelligence Layer
 
-> *To be filled after Milestone 3 is complete.*
+### What was built
+- `lib/intelligence/riskScore.ts` — penalty-based 0–100 risk score
+- `lib/intelligence/categorization.ts` — maps risk to Strong Fit / Needs Review / Weak Fit
+- `lib/intelligence/dataQuality.ts` — 100 minus deductions for missing data
+- `lib/intelligence/anomalyDetection.ts` — cross-field pattern checks
+- `components/confirmation/ConfirmationScreen.tsx` — visual assessment dashboard
+
+### Concept: Penalty-Based Risk Scoring
+
+Risk starts at 0 and penalties are **added** for each concern:
+```
++15  education gap > 24 months
++8   per active backlog
++10  low score (< 50%)
++12  career gap > 6 months
++5   per domain switch
++10  stale profile (no work + old graduation)
++8   weak work relevance (< 20% relevant)
+```
+All penalty values live in `lib/config/thresholds.ts`. Changing one number updates the entire system.
+
+### Concept: Risk vs Data Quality
+
+These are **independent axes**:
+- **Risk Score** = "Is this applicant likely to face problems?" → Based on gaps, scores, patterns
+- **Data Quality** = "Is this data complete and trustworthy?" → Based on missing fields, format issues
+
+A perfect-data application about a weak applicant → high quality, high risk.
+A messy-data application about a strong applicant → low quality, low risk.
+
+### Concept: Anomaly Detection vs Soft Flags
+
+| Soft Flags (Tier 2) | Anomalies |
+|---|---|
+| Threshold-based (gap > 24 mo) | Relationship-based (age vs education timeline) |
+| One data point | Multiple data points compared |
+| Expected edge cases | Possible data entry errors or fraud |
+
+### What to try yourself
+- Submit with a **CGPA of 2.0/10** → watch the risk score spike and see the penalty breakdown
+- Submit with **work start in 2015** but **UG completion in 2022** → anomaly detector flags it
+- Change `STRONG_FIT_MAX_RISK` in thresholds.ts from 30 to 10 → more applicants become "Needs Review"
 
 ---
 
